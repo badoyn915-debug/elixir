@@ -1,0 +1,22 @@
+{
+  "vertex": "elixir:core/post/sky/sky",
+  "fragment": "elixir:core/post/sky/nebula",
+  "samplers": [],
+  "uniforms": [
+    { "name": "ModelViewMat",   "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "ProjMat",        "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "uTime",          "type": "float",     "count": 1,  "values": [ 0.0 ] },
+    { "name": "uResolution",    "type": "float",     "count": 2,  "values": [ 1920.0, 1080.0 ] },
+    { "name": "uColor",         "type": "float",     "count": 3,  "values": [ 1.0, 1.0, 1.0 ] },
+    { "name": "uAlpha",         "type": "float",     "count": 1,  "values": [ 1.0 ] },
+    { "name": "uSpeed",         "type": "float",     "count": 1,  "values": [ 1.0 ] },
+    { "name": "uCameraAngles",  "type": "float",     "count": 2,  "values": [ 0.0, 0.0 ] },
+    { "name": "uCameraDir",     "type": "float",     "count": 2,  "values": [ 0.0, 0.0 ] },
+    { "name": "uFov",           "type": "float",     "count": 1,  "values": [ 75.0 ] },
+    { "name": "uDensity",       "type": "float",     "count": 1,  "values": [ 1.2 ] },
+    { "name": "uGlow",          "type": "float",     "count": 1,  "values": [ 1.5 ] },
+    { "name": "uParallax",      "type": "float",     "count": 1,  "values": [ 1.0 ] },
+    { "name": "uParticles",     "type": "float",     "count": 1,  "values": [ 1.0 ] },
+    { "name": "uQualitySteps",  "type": "int",       "count": 1,  "values": [ 48 ] }
+  ]
+}

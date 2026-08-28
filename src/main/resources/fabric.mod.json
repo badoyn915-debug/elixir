@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "renderextras",
+  "version": "${version}",
+  "name": "Render Extras",
+  "description": "Client rendering utilities",
+  "authors": [
+    "RenderExtras"
+  ],
+  "contact": {
+    "website": "",
+    "repo": "none"
+  },
+  "license": "All-Rights-Reserved",
+  "icon": "assets/minecraft/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "code.elixir.Elixir",
+      "code.elixir.common.proxy.ProxyServer"
+    ]
+  },
+  "mixins": [
+    "mixins.json"
+  ],
+  "accessWidener": "accesswidener",
+  "depends": {
+    "fabricloader": ">=0.16.8",
+    "fabric": "*",
+    "minecraft": "~1.21.4"
+  }
+}

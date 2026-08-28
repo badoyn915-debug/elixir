@@ -1,0 +1,8 @@
+.gradle/
+build/
+.loom/
+.idea/
+*.iml
+out/
+run/
+prompt.txt
