@@ -791,7 +791,9 @@ public class MenuScreen extends Screen implements QuickImports {
             float panelW = layout.settingsWidth;
             float panelH = layout.settingsHeight;
             float panelAlpha = 0.55F + eased * 0.45F;
-            Calculate.setAlpha(panelAlpha, () -> {});
+            int settingsBg = Calculate.applyOpacity(ThemeManager.BackgroundSettings.getColor(), (int)(215.0F * panelAlpha));
+            rectangle.render(ShapeProperties.create(matrices, panelX, panelY, panelW, panelH).round(10.0F).color(settingsBg).build());
+            rectangle.render(ShapeProperties.create(matrices, panelX + 6.0F, panelY, panelW - 12.0F, 1.0F).color(0x25FFFFFF).build());
             if (!(this.settingsPanelAnim < 0.01F)) {
                List<AbstractSettingComponent> settingComponents = this.expandedModules.get(this.displayedSettingsModule);
                if (settingComponents != null && !settingComponents.isEmpty()) {
@@ -2290,18 +2292,28 @@ public class MenuScreen extends Screen implements QuickImports {
       float selectedAnim = this.moduleSelectAnimations.getOrDefault(module, selected ? 1.0F : 0.0F);
       selectedAnim = Calculate.interpolateSmooth(7.0, selectedAnim, selected ? 1.0F : 0.0F);
       this.moduleSelectAnimations.put(module, selectedAnim);
-      int base = ThemeManager.BackgroundGui.getColor();
-      int bg = Calculate.applyOpacity(base, (int)(80.0F + hoverAnim * 34.0F + selectedAnim * 36.0F));
-      rectangle.render(ShapeProperties.create(matrices, x, y, width, 20.0).round(6.0F).color(bg).build());
+      float cardRound = 7.0F;
+      int offBg = Calculate.applyOpacity(ThemeManager.offModuleColor.getColor(), (int)(150.0F + hoverAnim * 40.0F + selectedAnim * 30.0F));
+      rectangle.render(ShapeProperties.create(matrices, x, y, width, 20.0).round(cardRound).color(offBg).build());
       if (enabledAnim > 0.002F) {
-         float accentH = 14.0F * (0.55F + 0.45F * enabledAnim);
-         float accentY = y + 10.0F - accentH / 2.0F;
+         int activeColor1 = Calculate.applyOpacity(ColorAssist.getClientColor(), (int)(enabledAnim * 200.0F));
+         int activeColor2 = Calculate.applyOpacity(ColorAssist.getClientColor2(), (int)(enabledAnim * 180.0F));
          rectangle.render(
-            ShapeProperties.create(matrices, x + 2.0F, accentY, 1.5, accentH)
-               .round(1.2F)
-               .color(Calculate.applyOpacity(ColorAssist.getClientColor(), (int)(enabledAnim * 255.0F)))
+            ShapeProperties.create(matrices, x, y, width, 20.0)
+               .round(cardRound)
+               .color(activeColor1, activeColor1, activeColor2, activeColor2)
                .build()
          );
+      }
+
+      int rimColor = enabled
+         ? Calculate.applyOpacity(-1, (int)(45.0F + enabledAnim * 45.0F))
+         : Calculate.applyOpacity(-1, (int)(15.0F + hoverAnim * 25.0F));
+      rectangle.render(ShapeProperties.create(matrices, x + 4.0F, y, width - 8.0F, 1.0F).color(rimColor).build());
+
+      if (selectedAnim > 0.01F) {
+         int selBorderColor = Calculate.applyOpacity(ThemeManager.primaryColor.getColor(), (int)(selectedAnim * 160.0F));
+         rectangle.render(ShapeProperties.create(matrices, x, y, 2.5F, 20.0).round(1.5F).color(selBorderColor).build());
       }
 
       String moduleName = module.getVisibleName();
@@ -2310,20 +2322,26 @@ public class MenuScreen extends Screen implements QuickImports {
       float textY = moduleFont.getCenteredY(y, 20.0F, moduleName);
       int moduleTextColor = enabled
          ? ThemeManager.textColor.getColor()
-         : Calculate.applyOpacity(ThemeManager.textColor.getColor(), (int)(90.0F + hoverAnim * 25.0F));
+         : Calculate.applyOpacity(ThemeManager.textColor.getColor(), (int)(110.0F + hoverAnim * 35.0F));
       if (shakeColorMix > 0.001F) {
          moduleTextColor = ColorAssist.lerp(shakeColorMix, moduleTextColor, -49088);
       }
 
       moduleFont.drawString(matrices, moduleName, textX + shakeX, textY, moduleTextColor);
+
       float rightX = x + width - 6.0F;
-      float dotSize = 3.6F + enabledAnim * 1.2F;
-      float dotX = rightX - dotSize;
-      float dotY = y + 10.0F - dotSize / 2.0F;
-      int dotColor = enabled
-         ? Calculate.applyOpacity(ColorAssist.getClientColor(), (int)(180.0F + enabledAnim * 75.0F))
-         : Calculate.applyOpacity(ThemeManager.textColor.getColor(), (int)(60.0F + hoverAnim * 50.0F));
-      rectangle.render(ShapeProperties.create(matrices, dotX, dotY, dotSize, dotSize).round(4.0F).color(dotColor).build());
+      float switchW = 18.0F;
+      float switchH = 10.0F;
+      float switchX = rightX - switchW;
+      float switchY = y + 10.0F - switchH / 2.0F;
+      int trackColor = enabled
+         ? Calculate.applyOpacity(ColorAssist.getClientColor2(), (int)(180.0F + enabledAnim * 75.0F))
+         : Calculate.applyOpacity(ThemeManager.textColor.getColor(), (int)(40.0F + hoverAnim * 30.0F));
+      rectangle.render(ShapeProperties.create(matrices, switchX, switchY, switchW, switchH).round(5.0F).color(trackColor).build());
+      float thumbSize = 7.0F;
+      float thumbX = switchX + 1.5F + enabledAnim * (switchW - thumbSize - 3.0F);
+      float thumbY = switchY + (switchH - thumbSize) / 2.0F;
+      rectangle.render(ShapeProperties.create(matrices, thumbX, thumbY, thumbSize, thumbSize).round(3.5F).color(-1).build());
       boolean isBinding = this.bindingModule == module;
       String bindText = isBinding ? "" : this.getBindText(module);
       if (isBinding) {
@@ -2372,7 +2390,6 @@ public class MenuScreen extends Screen implements QuickImports {
          rightX = badgeX - 6.0F;
       }
 
-      rightX = dotX - 6.0F;
       if (module == this.selectedModule) {
          this.lastModuleX = x;
          this.lastModuleY = y;

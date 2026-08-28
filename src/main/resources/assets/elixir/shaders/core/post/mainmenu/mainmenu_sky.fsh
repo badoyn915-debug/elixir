@@ -10,131 +10,83 @@ uniform vec2 uMouseFov;
 out vec4 fragColor;
 
 // =========================================================
-// PROCEDURAL LIQUID MARBLE SHADER (CONTINUOUS FLOW + JITTER-FREE PARALLAX)
+// ULTRA-FAST HIGH-FPS PROCEDURAL LIQUID MARBLE SHADER
 // =========================================================
 
-// --- Configurable Parameters ---
-#define SPEED           0.11     // Base fluid flow rate
-#define SCALE           1.85     // Pattern scale / frequency
-#define WARP_INTENSITY  1.40     // Fluid turbulence strength
-#define CONTRAST        1.22     // Tone curve response
-#define BRIGHTNESS      0.035    // Base black level lift
+#define SPEED           0.10
+#define SCALE           1.80
+#define CONTRAST        1.20
+#define BRIGHTNESS      0.035
 
-// 2D Rotation matrix
-mat2 rot(float a) {
-    float c = cos(a);
-    float s = sin(a);
-    return mat2(c, -s, s, c);
+// Fast 2D noise with polynomial smoothing
+float hash2(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
 }
 
-// Fast continuous 2D hash
-vec2 hash2(vec2 p) {
-    p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
-    return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
+float fastNoise2D(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+
+    float n00 = hash2(i);
+    float n10 = hash2(i + vec2(1.0, 0.0));
+    float n01 = hash2(i + vec2(0.0, 1.0));
+    float n11 = hash2(i + vec2(1.0, 1.0));
+
+    return mix(mix(n00, n10, f.x), mix(n01, n11, f.x), f.y);
 }
 
-// 2D Simplex Noise for smooth organic derivatives
-float snoise(vec2 p) {
-    const float K1 = 0.366025404; // (sqrt(3)-1)/2
-    const float K2 = 0.211324865; // (3-sqrt(3))/6
-
-    vec2 i = floor(p + (p.x + p.y) * K1);
-    vec2 a = p - i + (i.x + i.y) * K2;
-    float m = step(a.y, a.x);
-    vec2 o = vec2(m, 1.0 - m);
-    vec2 b = a - o + K2;
-    vec2 c = a - 1.0 + 2.0 * K2;
-
-    vec3 h = max(0.5 - vec3(dot(a, a), dot(b, b), dot(c, c)), 0.0);
-    vec3 n = h * h * h * h * vec3(dot(a, hash2(i)), dot(b, hash2(i + o)), dot(c, hash2(i + 1.0)));
-
-    return dot(n, vec3(70.0));
-}
-
-// Fractal Brownian Motion (4 octaves for optimal performance & richness)
-float fbm(vec2 p) {
-    float v = 0.0;
-    float a = 0.5;
-    mat2 m = rot(0.55);
-    for (int i = 0; i < 4; i++) {
-        v += a * snoise(p);
-        p = m * p * 2.02 + vec2(0.13, 0.27);
-        a *= 0.5;
-    }
-    return v;
-}
-
-// Deep Multi-Layer Domain Warping for viscous liquid marble folding
-float liquidMarble(vec2 p, float t, out vec2 warpQ, out vec2 warpR) {
-    // Primary Warp Layer (Macro organic swirling masses)
-    vec2 q = vec2(
-        fbm(p + vec2(0.0, 0.0) + vec2(t * 0.22, -t * 0.14)),
-        fbm(p + vec2(5.2, 1.3) + vec2(-t * 0.16, t * 0.20))
-    );
-    warpQ = q;
-
-    // Secondary Warp Layer (Intricate fluid folding veins)
-    vec2 r = vec2(
-        fbm(p + WARP_INTENSITY * q + vec2(1.7, 9.2) + vec2(t * 0.10, t * 0.06)),
-        fbm(p + WARP_INTENSITY * q + vec2(8.3, 2.8) + vec2(-t * 0.08, -t * 0.12))
-    );
-    warpR = r;
-
-    // Tertiary Final Field
-    return fbm(p + WARP_INTENSITY * r);
+// Fast 2-octave FBM with constant rotation matrix
+float fastFbm2(vec2 p) {
+    const mat2 m = mat2(0.80, 0.60, -0.60, 0.80);
+    return fastNoise2D(p) * 0.62 + fastNoise2D(m * p * 2.02 + vec2(0.13, 0.27)) * 0.38;
 }
 
 void main() {
-    // Isotropic, aspect-ratio corrected coordinates (never stretches on any resolution)
     vec2 aspect = vec2(uResolution.x / max(uResolution.y, 1.0), 1.0);
     vec2 uv = (texCoord - 0.5) * aspect * SCALE;
 
-    // --- SMOOTH CINEMATIC PARALLAX ---
-    // Smooth 3D depth tilt & parallax shift (ultra-smooth, zero jitter)
-    vec2 parallax = uMouseFov * 0.18;
-    uv += parallax * (0.90 + 0.25 * length(texCoord - 0.5));
+    // Smooth Jitter-Free Parallax
+    vec2 parallax = uMouseFov * 0.16;
+    uv += parallax * (0.90 + 0.20 * length(texCoord - 0.5));
 
-    // Independent continuous time animation
     float t = uTime * SPEED;
 
-    // Calculate layered fluid marble pattern
-    vec2 q, r;
-    float f = liquidMarble(uv, t, q, r);
+    // High-performance 2-pass domain warp
+    vec2 q = vec2(
+        fastFbm2(uv + vec2(t * 0.20, -t * 0.12)),
+        fastFbm2(uv + vec2(5.2, 1.3) + vec2(-t * 0.15, t * 0.18))
+    );
 
-    // Normalize pattern to [0, 1]
-    float pattern = clamp(f * 0.5 + 0.5, 0.0, 1.0);
+    vec2 r = vec2(
+        fastFbm2(uv + 1.25 * q + vec2(1.7, 9.2) + vec2(t * 0.08, t * 0.05)),
+        fastFbm2(uv + 1.25 * q + vec2(8.3, 2.8) + vec2(-t * 0.07, -t * 0.10))
+    );
 
-    // Fine delicate marble veins & filament lines
-    float veins = 1.0 - abs(f);
-    veins = pow(clamp(veins, 0.0, 1.0), 3.2);
+    float f = fastFbm2(uv + 1.25 * r);
 
-    // Capillary fluid streaks from secondary warp vectors
-    float streaks = length(r) * 0.5;
-    streaks = smoothstep(0.2, 0.85, streaks);
-
-    // Subtle ambient occlusion & surface depth lighting
+    // Normalize pattern
+    float pattern = clamp(f, 0.0, 1.0);
+    float veins = pow(clamp(1.0 - abs(f * 2.0 - 1.0), 0.0, 1.0), 3.0);
     float light = clamp(0.5 + 0.5 * (q.x - q.y + r.x), 0.0, 1.0);
 
-    // =========================================================
-    // MINIMALIST PREMIUM DARK / GRAPHITE MARBLE PALETTE
-    // =========================================================
-    vec3 cVoid     = vec3(0.020, 0.020, 0.024); // Deepest obsidian black
-    vec3 cDarkChar = vec3(0.055, 0.055, 0.065); // Dark charcoal
-    vec3 cGraphite = vec3(0.135, 0.135, 0.155); // Matte graphite
-    vec3 cSilver   = vec3(0.260, 0.265, 0.295); // Liquid silver / smoke
-    vec3 cSheen    = vec3(0.440, 0.450, 0.490); // Soft specular highlight
+    // Obsidian / Silver Marble Color Grading
+    vec3 cVoid     = vec3(0.018, 0.018, 0.022);
+    vec3 cDarkChar = vec3(0.050, 0.050, 0.060);
+    vec3 cGraphite = vec3(0.130, 0.130, 0.150);
+    vec3 cSilver   = vec3(0.250, 0.255, 0.285);
+    vec3 cSheen    = vec3(0.420, 0.430, 0.470);
 
-    // Multi-stage tonal layering with ultra-soft transitions
-    vec3 col = mix(cVoid, cDarkChar, smoothstep(0.08, 0.55, pattern));
-    col = mix(col, cGraphite, smoothstep(0.38, 0.82, pattern * light));
-    col = mix(col, cSilver, veins * 0.42);
-    col += cSheen * (pow(veins, 2.6) * 0.32 + streaks * 0.10 * light);
+    vec3 col = mix(cVoid, cDarkChar, smoothstep(0.10, 0.55, pattern));
+    col = mix(col, cGraphite, smoothstep(0.40, 0.85, pattern * light));
+    col = mix(col, cSilver, veins * 0.40);
+    col += cSheen * (veins * veins * 0.30 + length(r) * 0.08 * light);
 
-    // Dynamic contrast & gamma adjustment
-    col = pow(col, vec3(1.0 / CONTRAST));
-    col += vec3(BRIGHTNESS);
+    col = pow(col, vec3(1.0 / CONTRAST)) + vec3(BRIGHTNESS);
 
-    // Cinematic vignette for depth and elegance
+    // Smooth Vignette
     float dist = length((texCoord - 0.5) * 1.30);
     float vignette = smoothstep(1.45, 0.25, dist);
     col *= vignette;
