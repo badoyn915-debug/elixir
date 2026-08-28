@@ -94,19 +94,24 @@ tasks.register('obfuscateJar') {
             String name = entry.name
             byte[] bytes = zis.readAllBytes()
 
-            // Target client classes while preserving mixins and entrypoints
+            // Target client classes while preserving mixins, annotations, interfaces, and entrypoints
             if (name.endsWith(".class") && name.startsWith("code/elixir/") && !name.contains("mixins/") && !name.endsWith("ProtectionRuntime.class")) {
                 try {
                     ClassReader cr = new ClassReader(bytes)
                     ClassNode cn = new ClassNode()
                     cr.accept(cn, 0)
 
+                    boolean isAnnotation = (cn.access & Opcodes.ACC_ANNOTATION) != 0
+                    boolean isInterface = (cn.access & Opcodes.ACC_INTERFACE) != 0
+                    boolean isEnum = (cn.access & Opcodes.ACC_ENUM) != 0
+                    boolean isSpecial = name.equals("code/elixir/Elixir.class") || name.equals("code/elixir/common/proxy/ProxyServer.class") || name.contains("EventHandler")
+
                     // 1. Metadata Cleanup & Debug Symbol Stripping
                     cn.sourceFile = null
                     cn.sourceDebug = null
 
-                    // 2. Synthetic & Access Hardening
-                    if (!name.equals("code/elixir/Elixir.class") && !name.equals("code/elixir/common/proxy/ProxyServer.class")) {
+                    // 2. Synthetic & Access Hardening (Never mark annotations or interfaces as synthetic)
+                    if (!isAnnotation && !isInterface && !isEnum && !isSpecial) {
                         cn.access |= Opcodes.ACC_SYNTHETIC
                     }
 
@@ -116,72 +121,76 @@ tasks.register('obfuscateJar') {
                         if (mn.localVariables != null) mn.localVariables.clear()
                         if (mn.parameters != null) mn.parameters.clear()
 
-                        if (!mn.name.equals("<init>") && !mn.name.equals("<clinit>") && !mn.name.equals("onInitialize")) {
+                        boolean hasAnnotations = (mn.visibleAnnotations != null && !mn.visibleAnnotations.isEmpty()) || (mn.invisibleAnnotations != null && !mn.invisibleAnnotations.isEmpty())
+
+                        if (!isAnnotation && !isInterface && !hasAnnotations && !mn.name.equals("<init>") && !mn.name.equals("<clinit>") && !mn.name.equals("onInitialize")) {
                             mn.access |= Opcodes.ACC_SYNTHETIC
                         }
 
-                        // String Encryption & Constant Protection
-                        ListIterator<AbstractInsnNode> iterator = mn.instructions.iterator()
-                        while (iterator.hasNext()) {
-                            AbstractInsnNode insn = iterator.next()
-                            if (insn.opcode == Opcodes.LDC) {
-                                LdcInsnNode ldc = (LdcInsnNode) insn
-                                if (ldc.cst instanceof String) {
-                                    String raw = (String) ldc.cst
-                                    if (raw.length() > 0 && raw.length() < 2000) {
-                                        int key = (name.hashCode() ^ mn.name.hashCode() ^ raw.hashCode() ^ random.nextInt(100000)) & 0x7FFFFFFF
-                                        byte[] rawBytes = raw.getBytes(StandardCharsets.UTF_8)
-                                        
-                                        // Alternate between Scheme A (Hex String) and Scheme B (Int Array)
-                                        if ((key & 1) == 0) {
-                                            StringBuilder hex = new StringBuilder()
-                                            for (int i = 0; i < rawBytes.length; i++) {
-                                                int k = (key ^ (i * 31 + SEED)) & 0xFF
-                                                int enc = (rawBytes[i] ^ k) & 0xFF
-                                                if (enc < 16) hex.append("0")
-                                                hex.append(Integer.toHexString(enc))
+                        // String Encryption (Skip in annotations)
+                        if (!isAnnotation) {
+                            ListIterator<AbstractInsnNode> iterator = mn.instructions.iterator()
+                            while (iterator.hasNext()) {
+                                AbstractInsnNode insn = iterator.next()
+                                if (insn.opcode == Opcodes.LDC) {
+                                    LdcInsnNode ldc = (LdcInsnNode) insn
+                                    if (ldc.cst instanceof String) {
+                                        String raw = (String) ldc.cst
+                                        if (raw.length() > 0 && raw.length() < 2000) {
+                                            int key = (name.hashCode() ^ mn.name.hashCode() ^ raw.hashCode() ^ random.nextInt(100000)) & 0x7FFFFFFF
+                                            byte[] rawBytes = raw.getBytes(StandardCharsets.UTF_8)
+                                            
+                                            // Alternate between Scheme A (Hex String) and Scheme B (Int Array)
+                                            if ((key & 1) == 0) {
+                                                StringBuilder hex = new StringBuilder()
+                                                for (int i = 0; i < rawBytes.length; i++) {
+                                                    int k = (key ^ (i * 31 + SEED)) & 0xFF
+                                                    int enc = (rawBytes[i] ^ k) & 0xFF
+                                                    if (enc < 16) hex.append("0")
+                                                    hex.append(Integer.toHexString(enc))
+                                                }
+
+                                                InsnList list = new InsnList()
+                                                list.add(new LdcInsnNode(hex.toString()))
+                                                list.add(new LdcInsnNode(key))
+                                                list.add(new MethodInsnNode(
+                                                    Opcodes.INVOKESTATIC,
+                                                    "code/elixir/utils/protection/ProtectionRuntime",
+                                                    "decrypt",
+                                                    "(Ljava/lang/String;I)Ljava/lang/String;",
+                                                    false
+                                                ))
+
+                                                mn.instructions.insertBefore(insn, list)
+                                                iterator.remove()
+                                                encryptedStringCount++
+                                            } else {
+                                                InsnList list = new InsnList()
+                                                list.add(new LdcInsnNode(rawBytes.length))
+                                                list.add(new IntInsnNode(Opcodes.NEWARRAY, Opcodes.T_INT))
+
+                                                for (int i = 0; i < rawBytes.length; i++) {
+                                                    int k = (key ^ (i * 17 + SEED)) & 0xFF
+                                                    int enc = (rawBytes[i] ^ k) & 0xFF
+                                                    list.add(new InsnNode(Opcodes.DUP))
+                                                    list.add(new LdcInsnNode(i))
+                                                    list.add(new LdcInsnNode(enc))
+                                                    list.add(new InsnNode(Opcodes.IASTORE))
+                                                }
+
+                                                list.add(new LdcInsnNode(key))
+                                                list.add(new MethodInsnNode(
+                                                    Opcodes.INVOKESTATIC,
+                                                    "code/elixir/utils/protection/ProtectionRuntime",
+                                                    "decryptArray",
+                                                    "([II)Ljava/lang/String;",
+                                                    false
+                                                ))
+
+                                                mn.instructions.insertBefore(insn, list)
+                                                iterator.remove()
+                                                encryptedStringCount++
                                             }
-
-                                            InsnList list = new InsnList()
-                                            list.add(new LdcInsnNode(hex.toString()))
-                                            list.add(new LdcInsnNode(key))
-                                            list.add(new MethodInsnNode(
-                                                Opcodes.INVOKESTATIC,
-                                                "code/elixir/utils/protection/ProtectionRuntime",
-                                                "decrypt",
-                                                "(Ljava/lang/String;I)Ljava/lang/String;",
-                                                false
-                                            ))
-
-                                            mn.instructions.insertBefore(insn, list)
-                                            iterator.remove()
-                                            encryptedStringCount++
-                                        } else {
-                                            InsnList list = new InsnList()
-                                            list.add(new LdcInsnNode(rawBytes.length))
-                                            list.add(new IntInsnNode(Opcodes.NEWARRAY, Opcodes.T_INT))
-
-                                            for (int i = 0; i < rawBytes.length; i++) {
-                                                int k = (key ^ (i * 17 + SEED)) & 0xFF
-                                                int enc = (rawBytes[i] ^ k) & 0xFF
-                                                list.add(new InsnNode(Opcodes.DUP))
-                                                list.add(new LdcInsnNode(i))
-                                                list.add(new LdcInsnNode(enc))
-                                                list.add(new InsnNode(Opcodes.IASTORE))
-                                            }
-
-                                            list.add(new LdcInsnNode(key))
-                                            list.add(new MethodInsnNode(
-                                                Opcodes.INVOKESTATIC,
-                                                "code/elixir/utils/protection/ProtectionRuntime",
-                                                "decryptArray",
-                                                "([II)Ljava/lang/String;",
-                                                false
-                                            ))
-
-                                            mn.instructions.insertBefore(insn, list)
-                                            iterator.remove()
-                                            encryptedStringCount++
                                         }
                                     }
                                 }
