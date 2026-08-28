@@ -42,8 +42,6 @@ public abstract class LivingEntityMixin {
    private int handSwingTicks;
    @Shadow
    protected boolean handSwinging;
-   @Unique
-   private final MinecraftClient client = MinecraftClient.getInstance();
 
    @Shadow
    public abstract boolean hasStatusEffect(RegistryEntry<StatusEffect> var1);
@@ -177,7 +175,8 @@ public abstract class LivingEntityMixin {
       )}
    )
    private Vec3d hookFixRotation(Vec3d original) {
-      if (this.client.player != null && (Object)this == (Object)this.client.player) {
+      MinecraftClient client = MinecraftClient.getInstance();
+      if (client != null && client.player != null && (Object)this == client.player) {
          float yaw = TurnsConnection.INSTANCE.getMoveRotation().getYaw() * (float) (Math.PI / 180.0);
          return new Vec3d(-MathHelper.sin(yaw) * 0.2F, 0.0, MathHelper.cos(yaw) * 0.2F);
       } else {
@@ -193,7 +192,8 @@ public abstract class LivingEntityMixin {
       )}
    )
    private float hookModifyFallFlyingPitch(float original) {
-      return this.client.player != null && (Object)this == (Object)this.client.player ? TurnsConnection.INSTANCE.getMoveRotation().getPitch() : original;
+      MinecraftClient client = MinecraftClient.getInstance();
+      return client != null && client.player != null && (Object)this == client.player ? TurnsConnection.INSTANCE.getMoveRotation().getPitch() : original;
    }
 
    @ModifyExpressionValue(
@@ -204,7 +204,8 @@ public abstract class LivingEntityMixin {
       )}
    )
    private Vec3d hookModifyFallFlyingRotationVector(Vec3d original) {
-      return this.client.player != null && (Object)this == (Object)this.client.player ? TurnsConnection.INSTANCE.getMoveRotation().toVector() : original;
+      MinecraftClient client = MinecraftClient.getInstance();
+      return client != null && client.player != null && (Object)this == client.player ? TurnsConnection.INSTANCE.getMoveRotation().toVector() : original;
    }
 
    @Inject(
@@ -213,7 +214,8 @@ public abstract class LivingEntityMixin {
       cancellable = true
    )
    private void onCalcGlidingVelocityReturn(Vec3d oldVelocity, CallbackInfoReturnable<Vec3d> cir) {
-      if (this.client.player != null && (Object)this == (Object)this.client.player) {
+      MinecraftClient client = MinecraftClient.getInstance();
+      if (client != null && client.player != null && (Object)this == client.player) {
          if (EventManager.hasListeners(EventOnTravelPost.class)) {
             EventOnTravelPost event = SafeEvents.dispatch(() -> new EventOnTravelPost((Vec3d)cir.getReturnValue()));
             if (event != null) {
@@ -229,7 +231,8 @@ public abstract class LivingEntityMixin {
       cancellable = true
    )
    private void swingProgressHook(CallbackInfoReturnable<Integer> cir) {
-      if ((Object)this == (Object)this.client.player) {
+      MinecraftClient client = MinecraftClient.getInstance();
+      if (client != null && client.player != null && (Object)this == client.player) {
          SwingDurationEvent event = SafeEvents.dispatch(() -> new SwingDurationEvent());
          if (event != null && event.isCancelled()) {
             cir.setReturnValue((int)event.getAnimation());
@@ -255,7 +258,8 @@ public abstract class LivingEntityMixin {
 
    @Unique
    private void forceSwingRestartOnRetrigger() {
-      if (this.client.player != null && (Object)this == (Object)this.client.player) {
+      MinecraftClient client = MinecraftClient.getInstance();
+      if (client != null && client.player != null && (Object)this == client.player) {
          SwingAnimations swings = SwingAnimations.getInstance();
          if (swings != null && swings.shouldRestartSwingOnRetrigger()) {
             if (this.handSwinging) {

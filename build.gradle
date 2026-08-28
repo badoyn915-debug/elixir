@@ -1,5 +1,6 @@
 import org.objectweb.asm.*
 import org.objectweb.asm.tree.*
+import org.objectweb.asm.commons.*
 import java.util.zip.*
 import java.io.*
 import java.nio.charset.StandardCharsets
@@ -70,32 +71,92 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
-// Production-Grade Obfuscation Pipeline (prompt.txt compliance)
+// Production-Grade Obfuscation & Package Dispersion Pipeline (prompt.txt compliance)
 tasks.register('obfuscateJar') {
     dependsOn 'remapJar'
     doLast {
         File jarFile = remapJar.archiveFile.get().asFile
         if (!jarFile.exists()) return
 
-        println "[Obfuscator] Running Multi-Layer Obfuscation Pipeline on ${jarFile.name}..."
+        println "[Obfuscator] Running Multi-Layer Obfuscation & Package Dispersion on ${jarFile.name}..."
         File tempFile = new File(jarFile.parentFile, jarFile.name + ".temp")
 
         int encryptedStringCount = 0
         int transformedClasses = 0
-        int opaquePredicatesCount = 0
         int SEED = 0x5F3759DF
         Random random = new Random()
 
+        // Read all entries into memory
+        Map<String, byte[]> entries = new LinkedHashMap<>()
         ZipInputStream zis = new ZipInputStream(new FileInputStream(jarFile))
-        ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(tempFile))
-
         ZipEntry entry
         while ((entry = zis.getNextEntry()) != null) {
-            String name = entry.name
-            byte[] bytes = zis.readAllBytes()
+            entries.put(entry.name, zis.readAllBytes())
+            zis.closeEntry()
+        }
+        zis.close()
 
-            // Target client classes while preserving mixins, annotations, interfaces, and entrypoints
-            if (name.endsWith(".class") && name.startsWith("code/elixir/") && !name.contains("mixins/") && !name.endsWith("ProtectionRuntime.class")) {
+        // 1. Build Package / Namespace Dispersion Mapping Table
+        Map<String, String> mappings = new HashMap<>()
+        String[] dispersedPrefixes = [
+            "code/elixir/v1/net",
+            "code/elixir/core/sys",
+            "code/elixir/impl/io",
+            "code/elixir/res/data",
+            "code/elixir/drv/mem",
+            "code/elixir/pipe/flow",
+            "code/elixir/sec/auth",
+            "code/elixir/lib/util"
+        ]
+
+        int classIndex = 0
+        for (String name : entries.keySet()) {
+            if (name.endsWith(".class") && name.startsWith("code/elixir/")) {
+                String internalName = name.substring(0, name.length() - 6)
+                
+                // Exclude entrypoints, mixins, annotations, and core interfaces
+                boolean isExcluded = internalName.equals("code/elixir/Elixir") ||
+                                     internalName.equals("code/elixir/common/proxy/ProxyServer") ||
+                                     internalName.startsWith("code/elixir/mixins/") ||
+                                     internalName.equals("code/elixir/utils/protection/ProtectionRuntime") ||
+                                     internalName.contains("EventHandler")
+
+                if (!isExcluded && !internalName.contains('$')) {
+                    String prefix = dispersedPrefixes[Math.abs(internalName.hashCode()) % dispersedPrefixes.length]
+                    String complexSub = Integer.toHexString((int)((internalName.hashCode() ^ 0x5EADBEEF) & 0xFFFF))
+                    String complexName = "Cl_" + Integer.toHexString((int)((classIndex * 31 ^ 0x5AFEBABE) & 0xFFFFFF))
+                    String dispersedName = prefix + "/d_" + complexSub + "/" + complexName
+                    mappings.put(internalName, dispersedName)
+                    classIndex++
+                }
+            }
+        }
+
+        // Map inner classes according to their outer class mapping
+        for (String name : entries.keySet()) {
+            if (name.endsWith(".class") && name.startsWith("code/elixir/")) {
+                String internalName = name.substring(0, name.length() - 6)
+                if (internalName.contains('$')) {
+                    int lastDollar = internalName.lastIndexOf('$')
+                    String outerName = internalName.substring(0, lastDollar)
+                    String innerPart = internalName.substring(lastDollar)
+                    if (mappings.containsKey(outerName)) {
+                        mappings.put(internalName, mappings.get(outerName) + innerPart)
+                    }
+                }
+            }
+        }
+
+        SimpleRemapper remapper = new SimpleRemapper(mappings)
+
+        // 2. Transform and Remap Classes
+        Map<String, byte[]> outputEntries = new LinkedHashMap<>()
+        for (Map.Entry<String, byte[]> e : entries.entrySet()) {
+            String name = e.getKey()
+            byte[] bytes = e.getValue()
+
+            if (name.endsWith(".class") && name.startsWith("code/elixir/")) {
+                String internalName = name.substring(0, name.length() - 6)
                 try {
                     ClassReader cr = new ClassReader(bytes)
                     ClassNode cn = new ClassNode()
@@ -104,31 +165,30 @@ tasks.register('obfuscateJar') {
                     boolean isAnnotation = (cn.access & Opcodes.ACC_ANNOTATION) != 0
                     boolean isInterface = (cn.access & Opcodes.ACC_INTERFACE) != 0
                     boolean isEnum = (cn.access & Opcodes.ACC_ENUM) != 0
-                    boolean isSpecial = name.equals("code/elixir/Elixir.class") || name.equals("code/elixir/common/proxy/ProxyServer.class") || name.contains("EventHandler")
+                    boolean isMixin = name.contains("mixins/")
+                    boolean isSpecial = name.equals("code/elixir/Elixir.class") || name.equals("code/elixir/common/proxy/ProxyServer.class") || name.contains("EventHandler") || isMixin
 
-                    // 1. Metadata Cleanup & Debug Symbol Stripping
+                    // Metadata Cleanup & Debug Symbol Stripping
                     cn.sourceFile = null
                     cn.sourceDebug = null
 
-                    // 2. Synthetic & Access Hardening (Never mark annotations or interfaces as synthetic)
                     if (!isAnnotation && !isInterface && !isEnum && !isSpecial) {
                         cn.access |= Opcodes.ACC_SYNTHETIC
                     }
 
-                    // 3. Method-level transformations: Control flow & String/Constant protection
+                    // Method-level transformations
                     for (MethodNode mn : cn.methods) {
-                        // Strip Local Variables and Parameters
                         if (mn.localVariables != null) mn.localVariables.clear()
                         if (mn.parameters != null) mn.parameters.clear()
 
                         boolean hasAnnotations = (mn.visibleAnnotations != null && !mn.visibleAnnotations.isEmpty()) || (mn.invisibleAnnotations != null && !mn.invisibleAnnotations.isEmpty())
 
-                        if (!isAnnotation && !isInterface && !hasAnnotations && !mn.name.equals("<init>") && !mn.name.equals("<clinit>") && !mn.name.equals("onInitialize")) {
+                        if (!isAnnotation && !isInterface && !isMixin && !hasAnnotations && !mn.name.equals("<init>") && !mn.name.equals("<clinit>") && !mn.name.equals("onInitialize")) {
                             mn.access |= Opcodes.ACC_SYNTHETIC
                         }
 
-                        // String Encryption (Skip in annotations)
-                        if (!isAnnotation) {
+                        // String Encryption (Skip in mixins & annotations)
+                        if (!isAnnotation && !isMixin) {
                             ListIterator<AbstractInsnNode> iterator = mn.instructions.iterator()
                             while (iterator.hasNext()) {
                                 AbstractInsnNode insn = iterator.next()
@@ -140,7 +200,6 @@ tasks.register('obfuscateJar') {
                                             int key = (name.hashCode() ^ mn.name.hashCode() ^ raw.hashCode() ^ random.nextInt(100000)) & 0x7FFFFFFF
                                             byte[] rawBytes = raw.getBytes(StandardCharsets.UTF_8)
                                             
-                                            // Alternate between Scheme A (Hex String) and Scheme B (Int Array)
                                             if ((key & 1) == 0) {
                                                 StringBuilder hex = new StringBuilder()
                                                 for (int i = 0; i < rawBytes.length; i++) {
@@ -198,29 +257,37 @@ tasks.register('obfuscateJar') {
                         }
                     }
 
-                    // 4. Quality Gate Verification with COMPUTE_MAXS
+                    // Apply Remapper for Namespace Dispersion
                     ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS)
-                    cn.accept(cw)
-                    bytes = cw.toByteArray()
+                    ClassRemapper classRemapper = new ClassRemapper(cw, remapper)
+                    cn.accept(classRemapper)
+                    byte[] transformedBytes = cw.toByteArray()
+
+                    String newEntryName = (mappings.containsKey(internalName) ? mappings.get(internalName) : internalName) + ".class"
+                    outputEntries.put(newEntryName, transformedBytes)
                     transformedClasses++
-                } catch (Exception e) {
-                    println "Quality Gate Warning: Retaining original for ${name}: ${e.message}"
+                    continue
+                } catch (Exception ex) {
+                    println "Warning: Preserving original for ${name}: ${ex.message}"
                 }
             }
 
-            ZipEntry newEntry = new ZipEntry(name)
-            zos.putNextEntry(newEntry)
-            zos.write(bytes)
-            zos.closeEntry()
-            zis.closeEntry()
+            outputEntries.put(name, bytes)
         }
 
-        zis.close()
+        // 3. Write Protected & Dispersed Jar
+        ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(tempFile))
+        for (Map.Entry<String, byte[]> outEntry : outputEntries.entrySet()) {
+            ZipEntry ze = new ZipEntry(outEntry.getKey())
+            zos.putNextEntry(ze)
+            zos.write(outEntry.getValue())
+            zos.closeEntry()
+        }
         zos.close()
 
         jarFile.delete()
         tempFile.renameTo(jarFile)
-        println "[Obfuscator] Quality Gate Passed! Successfully protected ${transformedClasses} classes and encrypted ${encryptedStringCount} strings."
+        println "[Obfuscator] Successfully dispersed ${mappings.size()} client classes across complex namespaces and encrypted ${encryptedStringCount} strings!"
     }
 }
 
