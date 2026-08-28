@@ -301,10 +301,9 @@ public class MenuScreen extends Screen implements QuickImports {
       float currentAlpha = animController.isClosing() ? animController.getAlpha() : this.getScaleAnimation();
       float offsetX = animController.isClosing() ? animController.getOffsetX() : 0.0F;
       float offsetY = animController.isClosing() ? animController.getOffsetY() : 0.0F;
-      code.elixir.utils.display.render.MainMenuSkyRenderer.render(context, window.getScaledWidth(), window.getScaledHeight(), currentAlpha);
       rectangle.render(
          ShapeProperties.create(context.getMatrices(), 0.0, 0.0, window.getScaledWidth(), window.getScaledHeight())
-            .color(Calculate.applyOpacity(-16777216, 125.0F * currentAlpha))
+            .color(Calculate.applyOpacity(-16777216, 120.0F * currentAlpha))
             .build()
       );
 
@@ -385,10 +384,11 @@ public class MenuScreen extends Screen implements QuickImports {
          this.drawBlurMaskSafe(matrices, layout.x, layout.y, layout.width, layout.height, 16.0F);
       }
 
-      rectangle.render(ShapeProperties.create(matrices, layout.x, layout.y, layout.width, layout.height).round(12.0F).color(bodyColor).build());
-      rectangle.render(ShapeProperties.create(matrices, layout.x, layout.y, layout.sidebarWidth, layout.height).round(12.0F, 0.0F, 12.0F, 0.0F).color(sidebarColor).build());
-      rectangle.render(ShapeProperties.create(matrices, layout.x + layout.sidebarWidth, layout.y + 10.0F, 1.0F, layout.height - 20.0F).color(0x20FFFFFF).build());
-      rectangle.render(ShapeProperties.create(matrices, layout.x + 10.0F, layout.y, layout.width - 20.0F, 1.0F).color(0x30FFFFFF).build());
+      rectangle.render(ShapeProperties.create(matrices, layout.x, layout.y, layout.width, layout.height).round(14.0F).color(bodyColor).build());
+      rectangle.render(ShapeProperties.create(matrices, layout.x, layout.y, layout.sidebarWidth, layout.height).round(14.0F, 0.0F, 14.0F, 0.0F).color(sidebarColor).build());
+      rectangle.render(ShapeProperties.create(matrices, layout.x + layout.sidebarWidth, layout.y + 10.0F, 1.0F, layout.height - 20.0F).color(0x18FFFFFF).build());
+      rectangle.render(ShapeProperties.create(matrices, layout.x + 14.0F, layout.y, layout.width - 28.0F, 1.0F).color(0x35FFFFFF).build());
+      rectangle.render(ShapeProperties.create(matrices, layout.x, layout.y + 14.0F, 1.0F, layout.height - 28.0F).color(0x20FFFFFF).build());
       this.renderSidebar(context, layout, mouseX, mouseY);
       this.renderContent(context, layout, mouseX, mouseY, delta);
       windowManager.render(context, (int)mouseX, (int)mouseY, delta);
@@ -503,15 +503,16 @@ public class MenuScreen extends Screen implements QuickImports {
             .build()
       );
       float cardWidth = layout.sidebarWidth - 16.0F;
-      float cardHeight = 28.0F;
+      float cardHeight = 30.0F;
       float cardX = layout.x + 8.0F;
       float cardY = layout.y + layout.height - cardHeight - 8.0F;
       rectangle.render(
          ShapeProperties.create(matrices, cardX, cardY, cardWidth, cardHeight)
-            .round(6.0F)
-            .color(Calculate.applyOpacity(ThemeManager.BackgroundGui.getColor(), 120.0F))
+            .round(8.0F)
+            .color(Calculate.applyOpacity(ThemeManager.BackgroundGui.getColor(), 170.0F))
             .build()
       );
+      rectangle.render(ShapeProperties.create(matrices, cardX + 4.0F, cardY, cardWidth - 8.0F, 1.0F).color(0x28FFFFFF).build());
       float avatarSize = 16.0F;
       float avatarX = cardX + 6.0F;
       float avatarY = cardY + (cardHeight - avatarSize) / 2.0F;
@@ -603,16 +604,17 @@ public class MenuScreen extends Screen implements QuickImports {
       FontRenderer titleFont = Fonts.getSize(15, Fonts.Type.ROCKSTAR_MEDIUM);
       float iconSize = this.getCategoryIconWidth(this.category, iconFont, icon);
       float textWidth = titleFont.getStringWidth(title);
-      float badgeWidth = iconSize + textWidth + 18.0F;
+      float badgeWidth = iconSize + textWidth + 20.0F;
       float badgeX = layout.headerX + 10.0F;
       float badgeH = layout.headerHeight - 6.0F;
       float badgeY = layout.headerY + (layout.headerHeight - badgeH) / 2.0F;
       rectangle.render(
          ShapeProperties.create(matrices, badgeX, badgeY, badgeWidth, badgeH)
-            .round(6.0F)
-            .color(Calculate.applyOpacity(ThemeManager.BackgroundGui.getColor(), 140.0F))
+            .round(8.0F)
+            .color(Calculate.applyOpacity(ThemeManager.BackgroundGui.getColor(), 180.0F))
             .build()
       );
+      rectangle.render(ShapeProperties.create(matrices, badgeX + 4.0F, badgeY, badgeWidth - 8.0F, 1.0F).color(0x28FFFFFF).build());
       float iconTextH = this.category == ModuleCategory.ESP ? 9.0F : Math.min(iconFont.getStringHeight(icon), badgeH);
       float iconDrawY;
       if (this.category == ModuleCategory.ESP) {
@@ -632,18 +634,19 @@ public class MenuScreen extends Screen implements QuickImports {
          long enabled = categoryModules.stream().filter(Module::isState).count();
          String countText = enabled + "/" + categoryModules.size();
          FontRenderer countFont = Fonts.getSize(12, Fonts.Type.ROCKSTAR_MEDIUM);
-         float countWidth = countFont.getStringWidth(countText) + 10.0F;
+         float countWidth = countFont.getStringWidth(countText) + 14.0F;
          float countX = layout.headerX + layout.headerWidth - countWidth - 10.0F;
          rectangle.render(
             ShapeProperties.create(matrices, countX, badgeY, countWidth, badgeH)
-               .round(6.0F)
+               .round(8.0F)
                .color(Calculate.applyOpacity(ThemeManager.BackgroundGui.getColor(), 180.0F))
                .build()
          );
+         rectangle.render(ShapeProperties.create(matrices, countX + 3.0F, badgeY, countWidth - 6.0F, 1.0F).color(0x28FFFFFF).build());
          float countDrawY = this.category == ModuleCategory.ESP
             ? iconDrawY + (9.0F - countFont.getStringHeight(countText)) / 2.0F
             : countFont.getCenteredY(badgeY, badgeH, countText);
-         countFont.drawString(matrices, countText, countX + 5.0F, countDrawY, Calculate.applyOpacity(ThemeManager.textColor.getColor(), 150.0F));
+         countFont.drawString(matrices, countText, countX + 7.0F, countDrawY, Calculate.applyOpacity(ThemeManager.textColor.getColor(), 160.0F));
       }
    }
 
