@@ -322,7 +322,13 @@ public class MenuScreen extends Screen implements QuickImports {
       context.getMatrices().translate(centerX + offsetX, centerY + offsetY, 0.0F);
       context.getMatrices().scale(scale, scale, 1.0F);
       context.getMatrices().translate(-centerX, -centerY, 0.0F);
-      Calculate.setAlpha(currentAlpha, () -> this.renderSidebarLayout(context, (float)transformedMouseX, (float)transformedMouseY, delta));
+      boolean isClassic = ClickGui.getInstance() != null && ClickGui.getInstance().isClassic();
+      if (isClassic) {
+         this.updateColumnPositions();
+         Calculate.setAlpha(currentAlpha, () -> this.renderColumns(context, (float)transformedMouseX, (float)transformedMouseY, delta));
+      } else {
+         Calculate.setAlpha(currentAlpha, () -> this.renderSidebarLayout(context, (float)transformedMouseX, (float)transformedMouseY, delta));
+      }
       this.drawModuleTooltip(context);
       context.getMatrices().pop();
    }
@@ -2779,178 +2785,261 @@ public class MenuScreen extends Screen implements QuickImports {
       } else if (windowManager.mouseClicked(transformedX, transformedY, button)) {
          return true;
       } else {
-         MenuScreen.GuiLayout layout = this.getLayout();
-         float cardHeight = 28.0F;
-         float cardY = layout.y + layout.height - cardHeight - 8.0F;
-         float arrowOpenX = layout.x + 150.0F - 20.0F;
-         float arrowClosedX = layout.x - 14.0F;
-         float arrowX = arrowOpenX + (arrowClosedX - arrowOpenX) * this.sidebarCollapseAnim;
-         float arrowOpenY = cardY + (cardHeight - 12.0F) / 2.0F;
-         float arrowClosedY = layout.y + layout.height - 35.0F;
-         float arrowY = arrowOpenY + (arrowClosedY - arrowOpenY) * this.sidebarCollapseAnim;
-         if (Calculate.isHovered(transformedX, transformedY, arrowX - 4.0F, arrowY - 4.0F, 20.0, 20.0) && button == 0) {
-            this.sidebarCollapsed = !this.sidebarCollapsed;
-            SoundManager.playSound(SoundManager.CATEGORY_CLICK);
-            return true;
-         } else if (this.tooltipVisible
-            && this.hoveredModule != null
-            && Calculate.isHovered(transformedX, transformedY, this.tooltipX, this.tooltipY, this.tooltipW, this.tooltipH)) {
-            if (!this.hoveredModule.settings().isEmpty()) {
-               this.openModuleSettings(this.hoveredModule, layout.moduleListX, layout.moduleListY, layout.moduleListWidth);
-               SoundManager.playSound(SoundManager.CATEGORY_CLICK);
-            }
-
-            return true;
+         boolean isClassic = ClickGui.getInstance() != null && ClickGui.getInstance().isClassic();
+         if (isClassic) {
+            return this.handleClassicMouseClicked(transformedX, transformedY, button);
          } else {
-            boolean insideGui = Calculate.isHovered(transformedX, transformedY, layout.x, layout.y, layout.width, layout.height);
-            if (!insideGui) {
-               return false;
-            } else {
-               if (Calculate.isHovered(transformedX, transformedY, layout.x, layout.y, layout.sidebarWidth, layout.height)) {
-                  float itemOpenY = layout.sidebarSearchY + layout.sidebarSearchHeight + 12.0F;
-                  float itemClosedY = layout.y + 55.0F;
-                  float itemY = itemOpenY + (itemClosedY - itemOpenY) * this.sidebarCollapseAnim;
-                  float itemHeight = 22.0F;
+            return this.handleSidebarMouseClicked(transformedX, transformedY, button);
+         }
+      }
+   }
 
-                  for (ModuleCategory moduleCategory : this.getVisibleCategories()) {
-                     if (Calculate.isHovered(transformedX, transformedY, layout.x + 8.0F, itemY, layout.sidebarWidth - 16.0F, itemHeight)) {
-                        this.category = moduleCategory;
-                        this.searchFieldFocused = false;
-                        this.clearSettingsPanelState();
-                        this.espPreviewDragging = false;
-                        SoundManager.playSound(SoundManager.CATEGORY_CLICK);
-                        return true;
-                     }
-
-                     itemY += itemHeight + 4.0F;
-                  }
+   private boolean handleClassicMouseClicked(double transformedX, double transformedY, int button) {
+      for (MenuScreen.CategoryColumn column : this.categoryColumns.values()) {
+         if (this.getVisibleCategories().contains(column.category)) {
+            if (column.category == ModuleCategory.CUSTOMIZATION) {
+               float panelY = column.y + 28.0F + 4.0F;
+               float contentY = panelY + 10.0F;
+               float contentX = column.x + 10.0F;
+               float contentWidth = 110.0F;
+               this.customizationComponent.x = contentX;
+               this.customizationComponent.y = contentY;
+               this.customizationComponent.width = contentWidth;
+               if (this.customizationComponent.mouseClicked(transformedX, transformedY, button)) {
+                  SoundManager.playSound(SoundManager.SETTING_INTERACT);
+                  return true;
                }
+            } else {
+               List<Module> categoryModules = this.getFilteredModuleList(column.category, false);
+               float maxVisibleHeight = 198.0F;
+               float panelY = column.y + 28.0F + 4.0F;
+               float contentY = panelY + 10.0F;
+               float contentX = column.x + 10.0F;
+               float contentWidth = 110.0F;
+               if (Calculate.isHovered(transformedX, transformedY, contentX, contentY, contentWidth, maxVisibleHeight)) {
+                  float moduleY = contentY - column.scrollOffset;
+                  for (Module module : categoryModules) {
+                     if (moduleY >= contentY - 20.0F && moduleY < contentY + maxVisibleHeight && Calculate.isHovered(transformedX, transformedY, contentX, moduleY, contentWidth, 20.0)) {
+                        if (button == 0) {
+                           module.switchState();
+                           return true;
+                        }
+                        if (button == 1) {
+                           if (!module.settings().isEmpty()) {
+                              if (this.expandedModules.containsKey(module)) {
+                                 this.closeModuleSettings(module);
+                                 SoundManager.playSound(SoundManager.CLOSE_GUI);
+                              } else {
+                                 this.openModuleSettings(module, contentX, moduleY, contentWidth);
+                                 SoundManager.playSound(SoundManager.OPEN_GUI);
+                              }
+                           } else {
+                              this.triggerNoSettingsFeedback(module);
+                           }
+                           return true;
+                        }
+                        if (button == 2) {
+                           this.bindingModule = module;
+                           return true;
+                        }
+                     }
+                     moduleY += 22.0F;
+                     if (this.expandedModules.containsKey(module)) {
+                        List<AbstractSettingComponent> settingComponents = this.expandedModules.get(module);
+                        float expandProgress = this.expandAnimations.getOrDefault(module, 0.0F);
+                        float easedProgress = (float)(1.0 - Math.pow(1.0F - expandProgress, 3.0));
+                        for (AbstractSettingComponent component : settingComponents) {
+                           float settingHeight = (component.height + 2.0F) * easedProgress;
+                           if (moduleY < contentY + maxVisibleHeight && moduleY + settingHeight > contentY && easedProgress > 0.01F) {
+                              component.x = contentX;
+                              component.y = moduleY;
+                              component.width = contentWidth;
+                              if (component.mouseClicked(transformedX, transformedY, button)) {
+                                 SoundManager.playSound(SoundManager.SETTING_INTERACT);
+                                 return true;
+                              }
+                           }
+                           moduleY += settingHeight;
+                        }
+                     }
+                  }
+                  return true;
+               }
+            }
+         }
+      }
+      return false;
+   }
 
-               if (this.searchSuggestionsAnim > 0.05F
-                  && Calculate.isHovered(
-                     transformedX, transformedY, this.searchSuggestionsX, this.searchSuggestionsY, this.searchSuggestionsW, this.searchSuggestionsH
-                  )) {
-                  double var10000 = transformedY - this.searchSuggestionsY;
-                  float pad = 4.0F;
-                  var10000 -= 4.0F;
-                  float rowH = 16.0F;
-                  int clickedIndex;
-                  if ((clickedIndex = (int)(var10000 / 16.0F)) >= 0 && clickedIndex < this.searchSuggestions.size()) {
-                     this.applySearchSuggestion(clickedIndex);
-                     this.searchFieldFocused = true;
+   private boolean handleSidebarMouseClicked(double transformedX, double transformedY, int button) {
+      MenuScreen.GuiLayout layout = this.getLayout();
+      float cardHeight = 28.0F;
+      float cardY = layout.y + layout.height - cardHeight - 8.0F;
+      float arrowOpenX = layout.x + 150.0F - 20.0F;
+      float arrowClosedX = layout.x - 14.0F;
+      float arrowX = arrowOpenX + (arrowClosedX - arrowOpenX) * this.sidebarCollapseAnim;
+      float arrowOpenY = cardY + (cardHeight - 12.0F) / 2.0F;
+      float arrowClosedY = layout.y + layout.height - 35.0F;
+      float arrowY = arrowOpenY + (arrowClosedY - arrowOpenY) * this.sidebarCollapseAnim;
+      if (Calculate.isHovered(transformedX, transformedY, arrowX - 4.0F, arrowY - 4.0F, 20.0, 20.0) && button == 0) {
+         this.sidebarCollapsed = !this.sidebarCollapsed;
+         SoundManager.playSound(SoundManager.CATEGORY_CLICK);
+         return true;
+      } else if (this.tooltipVisible
+         && this.hoveredModule != null
+         && Calculate.isHovered(transformedX, transformedY, this.tooltipX, this.tooltipY, this.tooltipW, this.tooltipH)) {
+         if (!this.hoveredModule.settings().isEmpty()) {
+            this.openModuleSettings(this.hoveredModule, layout.moduleListX, layout.moduleListY, layout.moduleListWidth);
+            SoundManager.playSound(SoundManager.CATEGORY_CLICK);
+         }
+         return true;
+      } else {
+         boolean insideGui = Calculate.isHovered(transformedX, transformedY, layout.x, layout.y, layout.width, layout.height);
+         if (!insideGui) {
+            return false;
+         } else {
+            if (Calculate.isHovered(transformedX, transformedY, layout.x, layout.y, layout.sidebarWidth, layout.height)) {
+               float itemOpenY = layout.sidebarSearchY + layout.sidebarSearchHeight + 12.0F;
+               float itemClosedY = layout.y + 55.0F;
+               float itemY = itemOpenY + (itemClosedY - itemOpenY) * this.sidebarCollapseAnim;
+               float itemHeight = 22.0F;
+
+               for (ModuleCategory moduleCategory : this.getVisibleCategories()) {
+                  if (Calculate.isHovered(transformedX, transformedY, layout.x + 8.0F, itemY, layout.sidebarWidth - 16.0F, itemHeight)) {
+                     this.category = moduleCategory;
+                     this.searchFieldFocused = false;
+                     this.clearSettingsPanelState();
+                     this.espPreviewDragging = false;
+                     SoundManager.playSound(SoundManager.CATEGORY_CLICK);
                      return true;
                   }
+
+                  itemY += itemHeight + 4.0F;
                }
+            }
 
-               if (Calculate.isHovered(
-                  transformedX, transformedY, layout.sidebarSearchX, layout.sidebarSearchY, layout.sidebarSearchWidth, layout.sidebarSearchHeight
+            if (this.searchSuggestionsAnim > 0.05F
+               && Calculate.isHovered(
+                  transformedX, transformedY, this.searchSuggestionsX, this.searchSuggestionsY, this.searchSuggestionsW, this.searchSuggestionsH
                )) {
+               double var10000 = transformedY - this.searchSuggestionsY;
+               float pad = 4.0F;
+               var10000 -= 4.0F;
+               float rowH = 16.0F;
+               int clickedIndex;
+               if ((clickedIndex = (int)(var10000 / 16.0F)) >= 0 && clickedIndex < this.searchSuggestions.size()) {
+                  this.applySearchSuggestion(clickedIndex);
                   this.searchFieldFocused = true;
-                  this.searchCursor = this.getSearchCursorIndexAt((float)transformedX, layout.sidebarSearchX + 8.0F - this.searchTextScroll);
-                  this.clearSearchSelection();
                   return true;
-               } else {
-                  this.searchFieldFocused = false;
-                  if (this.category == ModuleCategory.CUSTOMIZATION) {
-                     this.customizationComponent.x = layout.moduleListX + 10.0F;
-                     this.customizationComponent.y = layout.moduleListY + 10.0F;
-                     this.customizationComponent.width = layout.moduleListWidth - 20.0F;
-                     if (this.customizationComponent.mouseClicked(transformedX, transformedY, button)) {
-                        SoundManager.playSound(SoundManager.SETTING_INTERACT);
-                        return true;
-                     } else {
-                        return true;
-                     }
-                  } else if (this.category == ModuleCategory.ESP) {
-                     if (button == 0 && Calculate.isHovered(transformedX, transformedY, this.espPreviewX, this.espPreviewY, this.espPreviewW, this.espPreviewH)
-                        )
-                      {
-                        this.espPreviewDragging = true;
-                        this.espDragStartX = (float)transformedX;
-                        this.espDragStartY = (float)transformedY;
-                        this.espDragStartYaw = this.espPreviewYaw;
-                        this.espDragStartPitch = this.espPreviewPitch;
-                        return true;
-                     } else if (this.isEspSettingsPanelHovered(transformedX, transformedY, layout)) {
-                        return this.handleEspSettingsClick(transformedX, transformedY, button, layout) ? true : true;
-                     } else {
-                        return true;
-                     }
+               }
+            }
+
+            if (Calculate.isHovered(
+               transformedX, transformedY, layout.sidebarSearchX, layout.sidebarSearchY, layout.sidebarSearchWidth, layout.sidebarSearchHeight
+            )) {
+               this.searchFieldFocused = true;
+               this.searchCursor = this.getSearchCursorIndexAt((float)transformedX, layout.sidebarSearchX + 8.0F - this.searchTextScroll);
+               this.clearSearchSelection();
+               return true;
+            } else {
+               this.searchFieldFocused = false;
+               if (this.category == ModuleCategory.CUSTOMIZATION) {
+                  this.customizationComponent.x = layout.moduleListX + 10.0F;
+                  this.customizationComponent.y = layout.moduleListY + 10.0F;
+                  this.customizationComponent.width = layout.moduleListWidth - 20.0F;
+                  if (this.customizationComponent.mouseClicked(transformedX, transformedY, button)) {
+                     SoundManager.playSound(SoundManager.SETTING_INTERACT);
+                     return true;
                   } else {
-                     MenuScreen.CategoryColumn column = this.categoryColumns
-                        .getOrDefault(this.category, new MenuScreen.CategoryColumn(this.category, 0.0F, 0.0F));
-                     List<Module> categoryModules = this.getFilteredModuleList(this.category, true);
-                     if (Calculate.isHovered(
-                        transformedX, transformedY, layout.moduleListX, layout.moduleListY, layout.moduleListWidth, layout.moduleListHeight
-                     )) {
-                        float moduleY = layout.moduleListY - column.scrollOffset;
+                     return true;
+                  }
+               } else if (this.category == ModuleCategory.ESP) {
+                  if (button == 0 && Calculate.isHovered(transformedX, transformedY, this.espPreviewX, this.espPreviewY, this.espPreviewW, this.espPreviewH)) {
+                     this.espPreviewDragging = true;
+                     this.espDragStartX = (float)transformedX;
+                     this.espDragStartY = (float)transformedY;
+                     this.espDragStartYaw = this.espPreviewYaw;
+                     this.espDragStartPitch = this.espPreviewPitch;
+                     return true;
+                  } else if (this.isEspSettingsPanelHovered(transformedX, transformedY, layout)) {
+                     return this.handleEspSettingsClick(transformedX, transformedY, button, layout) ? true : true;
+                  } else {
+                     return true;
+                  }
+               } else {
+                  MenuScreen.CategoryColumn column = this.categoryColumns
+                     .getOrDefault(this.category, new MenuScreen.CategoryColumn(this.category, 0.0F, 0.0F));
+                  List<Module> categoryModules = this.getFilteredModuleList(this.category, true);
+                  if (Calculate.isHovered(
+                     transformedX, transformedY, layout.moduleListX, layout.moduleListY, layout.moduleListWidth, layout.moduleListHeight
+                  )) {
+                     float moduleY = layout.moduleListY - column.scrollOffset;
 
-                        for (Module module : categoryModules) {
-                           if (moduleY >= layout.moduleListY - 20.0F
-                              && moduleY < layout.moduleListY + layout.moduleListHeight
-                              && Calculate.isHovered(transformedX, transformedY, layout.moduleListX, moduleY, layout.moduleListWidth, 20.0)) {
-                              if (button == 0) {
-                                 module.switchState();
-                                 if (this.expandedModules.containsKey(module)) {
-                                    this.selectedModule = module;
-                                 }
-
-                                 return true;
-                              }
-
-                              if (button == 1) {
-                                 if (!module.settings().isEmpty()) {
-                                    if (this.expandedModules.containsKey(module)) {
-                                       this.closeModuleSettings(module);
-                                       SoundManager.playSound(SoundManager.CLOSE_GUI);
-                                    } else {
-                                       this.openModuleSettings(module, layout.moduleListX, moduleY, layout.moduleListWidth);
-                                       SoundManager.playSound(SoundManager.OPEN_GUI);
-                                    }
-                                 } else {
-                                    this.triggerNoSettingsFeedback(module);
-                                 }
-
-                                 return true;
-                              }
-
-                              if (button == 2) {
-                                 this.bindingModule = module;
+                     for (Module module : categoryModules) {
+                        if (moduleY >= layout.moduleListY - 20.0F
+                           && moduleY < layout.moduleListY + layout.moduleListHeight
+                           && Calculate.isHovered(transformedX, transformedY, layout.moduleListX, moduleY, layout.moduleListWidth, 20.0)) {
+                           if (button == 0) {
+                              module.switchState();
+                              if (this.expandedModules.containsKey(module)) {
                                  this.selectedModule = module;
+                              }
+
+                              return true;
+                           }
+
+                           if (button == 1) {
+                              if (!module.settings().isEmpty()) {
+                                 if (this.expandedModules.containsKey(module)) {
+                                    this.closeModuleSettings(module);
+                                    SoundManager.playSound(SoundManager.CLOSE_GUI);
+                                 } else {
+                                    this.openModuleSettings(module, layout.moduleListX, moduleY, layout.moduleListWidth);
+                                    SoundManager.playSound(SoundManager.OPEN_GUI);
+                                 }
+                              } else {
+                                 this.triggerNoSettingsFeedback(module);
+                              }
+
+                              return true;
+                           }
+
+                           if (button == 2) {
+                              this.bindingModule = module;
+                              this.selectedModule = module;
+                              return true;
+                           }
+                        }
+
+                        moduleY += 22.0F;
+                     }
+                  }
+
+                  if (!Calculate.isHovered(transformedX, transformedY, layout.settingsX, layout.settingsY, layout.settingsWidth, layout.settingsHeight)) {
+                     return true;
+                  } else {
+                     if (this.isSettingsPanelInteractive()) {
+                        List<AbstractSettingComponent> settingComponents = this.expandedModules.get(this.selectedModule);
+                        float f = layout.settingsX + 10.0F;
+                        float contentY = layout.settingsY + 10.0F + 18.0F - this.settingsScrollOffset;
+                        float contentWidth = layout.settingsWidth - 20.0F;
+
+                        for (AbstractSettingComponent component : settingComponents) {
+                           if (component.getSetting().isVisible()) {
+                              component.prepareLayout(contentWidth);
+                              component.x = f;
+                              component.y = contentY;
+                              if (component.mouseClicked(transformedX, transformedY, button)) {
+                                 SoundManager.playSound(SoundManager.SETTING_INTERACT);
                                  return true;
                               }
-                           }
 
-                           moduleY += 22.0F;
+                              contentY += component.height + 4.0F;
+                           }
                         }
                      }
 
-                     if (!Calculate.isHovered(transformedX, transformedY, layout.settingsX, layout.settingsY, layout.settingsWidth, layout.settingsHeight)) {
-                        return true;
-                     } else {
-                        if (this.isSettingsPanelInteractive()) {
-                           List<AbstractSettingComponent> settingComponents = this.expandedModules.get(this.selectedModule);
-                           float f = layout.settingsX + 10.0F;
-                           float contentY = layout.settingsY + 10.0F + 18.0F - this.settingsScrollOffset;
-                           float contentWidth = layout.settingsWidth - 20.0F;
-
-                           for (AbstractSettingComponent component : settingComponents) {
-                              if (component.getSetting().isVisible()) {
-                                 component.prepareLayout(contentWidth);
-                                 component.x = f;
-                                 component.y = contentY;
-                                 if (component.mouseClicked(transformedX, transformedY, button)) {
-                                    SoundManager.playSound(SoundManager.SETTING_INTERACT);
-                                    return true;
-                                 }
-
-                                 contentY += component.height + 4.0F;
-                              }
-                           }
-                        }
-
-                        return true;
-                     }
+                     return true;
                   }
                }
             }
@@ -2963,47 +3052,68 @@ public class MenuScreen extends Screen implements QuickImports {
       float centerY = window.getScaledHeight() / 2.0F;
       float scale = this.getGuiScale() * this.scaleFactor;
       double transformedX = (mouseX - centerX) / scale + centerX;
-      double transformedY;
-      if (windowManager.mouseReleased(transformedX, transformedY = (mouseY - centerY) / scale + centerY, button)) {
+      double transformedY = (mouseY - centerY) / scale + centerY;
+      if (windowManager.mouseReleased(transformedX, transformedY, button)) {
          return true;
       } else {
-         if (this.category == ModuleCategory.ESP && button == 0) {
-            this.espPreviewDragging = false;
-         }
-
-         MenuScreen.GuiLayout layout = this.getLayout();
-         if (!Calculate.isHovered(transformedX, transformedY, layout.x, layout.y, layout.width, layout.height)) {
-            return false;
-         } else if (this.category == ModuleCategory.CUSTOMIZATION) {
-            this.customizationComponent.mouseReleased(transformedX, transformedY, button);
-            return true;
-         } else if (this.category == ModuleCategory.ESP) {
-            this.espPreviewDragging = false;
-            this.syncEspSettingsClickLayout(layout);
-            this.handleEspSectionComponentReleaseFromLayout(transformedX, transformedY, button, this.getNameTagsModule());
-            this.handleEspSectionComponentReleaseFromLayout(transformedX, transformedY, button, this.getEspSkeletonModule());
-            this.handleEspSectionComponentReleaseFromLayout(transformedX, transformedY, button, this.getEspModule());
-            return true;
+         boolean isClassic = ClickGui.getInstance() != null && ClickGui.getInstance().isClassic();
+         if (isClassic) {
+            return this.handleClassicMouseReleased(transformedX, transformedY, button);
          } else {
-            if (this.selectedModule != null && this.expandedModules.containsKey(this.selectedModule)) {
-               List<AbstractSettingComponent> settingComponents = this.expandedModules.get(this.selectedModule);
-               float contentX = layout.settingsX + 10.0F;
-               float contentY = layout.settingsY + 10.0F + 18.0F - this.settingsScrollOffset;
-               float contentWidth = layout.settingsWidth - 20.0F;
+            return this.handleSidebarMouseReleased(transformedX, transformedY, button);
+         }
+      }
+   }
 
-               for (AbstractSettingComponent component : settingComponents) {
-                  if (component.getSetting().isVisible()) {
-                     component.prepareLayout(contentWidth);
-                     component.x = contentX;
-                     component.y = contentY;
-                     component.mouseReleased(transformedX, transformedY, button);
-                     contentY += component.height + 4.0F;
-                  }
+   private boolean handleClassicMouseReleased(double transformedX, double transformedY, int button) {
+      for (List<AbstractSettingComponent> components : this.expandedModules.values()) {
+         for (AbstractSettingComponent component : components) {
+            component.mouseReleased(transformedX, transformedY, button);
+         }
+      }
+      if (this.customizationComponent != null) {
+         this.customizationComponent.mouseReleased(transformedX, transformedY, button);
+      }
+      return true;
+   }
+
+   private boolean handleSidebarMouseReleased(double transformedX, double transformedY, int button) {
+      if (this.category == ModuleCategory.ESP && button == 0) {
+         this.espPreviewDragging = false;
+      }
+
+      MenuScreen.GuiLayout layout = this.getLayout();
+      if (!Calculate.isHovered(transformedX, transformedY, layout.x, layout.y, layout.width, layout.height)) {
+         return false;
+      } else if (this.category == ModuleCategory.CUSTOMIZATION) {
+         this.customizationComponent.mouseReleased(transformedX, transformedY, button);
+         return true;
+      } else if (this.category == ModuleCategory.ESP) {
+         this.espPreviewDragging = false;
+         this.syncEspSettingsClickLayout(layout);
+         this.handleEspSectionComponentReleaseFromLayout(transformedX, transformedY, button, this.getNameTagsModule());
+         this.handleEspSectionComponentReleaseFromLayout(transformedX, transformedY, button, this.getEspSkeletonModule());
+         this.handleEspSectionComponentReleaseFromLayout(transformedX, transformedY, button, this.getEspModule());
+         return true;
+      } else {
+         if (this.selectedModule != null && this.expandedModules.containsKey(this.selectedModule)) {
+            List<AbstractSettingComponent> settingComponents = this.expandedModules.get(this.selectedModule);
+            float contentX = layout.settingsX + 10.0F;
+            float contentY = layout.settingsY + 10.0F + 18.0F - this.settingsScrollOffset;
+            float contentWidth = layout.settingsWidth - 20.0F;
+
+            for (AbstractSettingComponent component : settingComponents) {
+               if (component.getSetting().isVisible()) {
+                  component.prepareLayout(contentWidth);
+                  component.x = contentX;
+                  component.y = contentY;
+                  component.mouseReleased(transformedX, transformedY, button);
+                  contentY += component.height + 4.0F;
                }
             }
-
-            return true;
          }
+
+         return true;
       }
    }
 
@@ -3112,40 +3222,65 @@ public class MenuScreen extends Screen implements QuickImports {
          float centerY = window.getScaledHeight() / 2.0F;
          float scale = this.getGuiScale() * this.scaleFactor;
          double transformedX = (mouseX - centerX) / scale + centerX;
-         double transformedY;
-         if (windowManager.mouseScrolled(transformedX, transformedY = (mouseY - centerY) / scale + centerY, verticalAmount)) {
+         double transformedY = (mouseY - centerY) / scale + centerY;
+         if (windowManager.mouseScrolled(transformedX, transformedY, verticalAmount)) {
             return true;
          } else {
-            MenuScreen.GuiLayout layout = this.getLayout();
-            if (Calculate.isHovered(transformedX, transformedY, layout.x, layout.y, layout.width, layout.height)) {
-               if (this.category == ModuleCategory.CUSTOMIZATION) {
-                  return this.customizationComponent.mouseScrolled(transformedX, transformedY, verticalAmount);
-               } else if (this.category == ModuleCategory.ESP) {
-                  if (this.isEspSettingsPanelHovered(transformedX, transformedY, layout)) {
-                     this.settingsTargetScroll -= (float)verticalAmount * 60.0F;
-                     this.settingsTargetScroll = MathHelper.clamp(this.settingsTargetScroll, -100.0F, this.settingsMaxScroll + 100.0F);
-                  }
-
-                  return true;
-               } else if (Calculate.isHovered(
-                  transformedX, transformedY, layout.moduleListX, layout.moduleListY, layout.moduleListWidth, layout.moduleListHeight
-               )) {
-                  MenuScreen.CategoryColumn column = this.categoryColumns.getOrDefault(this.category, new MenuScreen.CategoryColumn(this.category, 0.0F, 0.0F));
-                  column.targetScrollOffset -= (float)verticalAmount * 60.0F;
-                  column.targetScrollOffset = MathHelper.clamp(column.targetScrollOffset, -100.0F, column.maxScroll + 100.0F);
-                  this.categoryColumns.put(this.category, column);
-                  return true;
-               } else if (Calculate.isHovered(transformedX, transformedY, layout.settingsX, layout.settingsY, layout.settingsWidth, layout.settingsHeight)) {
-                  this.settingsTargetScroll -= (float)verticalAmount * 60.0F;
-                  this.settingsTargetScroll = MathHelper.clamp(this.settingsTargetScroll, -100.0F, this.settingsMaxScroll + 100.0F);
-                  return true;
-               } else {
-                  return true;
-               }
+            boolean isClassic = ClickGui.getInstance() != null && ClickGui.getInstance().isClassic();
+            if (isClassic) {
+               return this.handleClassicMouseScrolled(transformedX, transformedY, verticalAmount);
             } else {
-               return false;
+               return this.handleSidebarMouseScrolled(transformedX, transformedY, verticalAmount);
             }
          }
+      }
+   }
+
+   private boolean handleClassicMouseScrolled(double transformedX, double transformedY, double verticalAmount) {
+      for (MenuScreen.CategoryColumn column : this.categoryColumns.values()) {
+         if (this.getVisibleCategories().contains(column.category)) {
+            if (Calculate.isHovered(transformedX, transformedY, column.x, column.y, 130.0F, 240.0F)) {
+               if (column.category == ModuleCategory.CUSTOMIZATION) {
+                  return this.customizationComponent.mouseScrolled(transformedX, transformedY, verticalAmount);
+               }
+               column.targetScrollOffset -= (float)verticalAmount * 60.0F;
+               column.targetScrollOffset = MathHelper.clamp(column.targetScrollOffset, -100.0F, column.maxScroll + 100.0F);
+               return true;
+            }
+         }
+      }
+      return false;
+   }
+
+   private boolean handleSidebarMouseScrolled(double transformedX, double transformedY, double verticalAmount) {
+      MenuScreen.GuiLayout layout = this.getLayout();
+      if (Calculate.isHovered(transformedX, transformedY, layout.x, layout.y, layout.width, layout.height)) {
+         if (this.category == ModuleCategory.CUSTOMIZATION) {
+            return this.customizationComponent.mouseScrolled(transformedX, transformedY, verticalAmount);
+         } else if (this.category == ModuleCategory.ESP) {
+            if (this.isEspSettingsPanelHovered(transformedX, transformedY, layout)) {
+               this.settingsTargetScroll -= (float)verticalAmount * 60.0F;
+               this.settingsTargetScroll = MathHelper.clamp(this.settingsTargetScroll, -100.0F, this.settingsMaxScroll + 100.0F);
+            }
+
+            return true;
+         } else if (Calculate.isHovered(
+            transformedX, transformedY, layout.moduleListX, layout.moduleListY, layout.moduleListWidth, layout.moduleListHeight
+         )) {
+            MenuScreen.CategoryColumn column = this.categoryColumns.getOrDefault(this.category, new MenuScreen.CategoryColumn(this.category, 0.0F, 0.0F));
+            column.targetScrollOffset -= (float)verticalAmount * 60.0F;
+            column.targetScrollOffset = MathHelper.clamp(column.targetScrollOffset, -100.0F, column.maxScroll + 100.0F);
+            this.categoryColumns.put(this.category, column);
+            return true;
+         } else if (Calculate.isHovered(transformedX, transformedY, layout.settingsX, layout.settingsY, layout.settingsWidth, layout.settingsHeight)) {
+            this.settingsTargetScroll -= (float)verticalAmount * 60.0F;
+            this.settingsTargetScroll = MathHelper.clamp(this.settingsTargetScroll, -100.0F, this.settingsMaxScroll + 100.0F);
+            return true;
+         } else {
+            return true;
+         }
+      } else {
+         return false;
       }
    }
 
