@@ -42,25 +42,31 @@ public class ModuleComponent extends AbstractComponent {
    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
       boolean hasSettings = !this.module.settings().isEmpty();
       boolean isExpanded = this.isExpanded();
-      this.height = 20.0F;
+      this.height = 22.0F;
       int backgroundColor = this.module.isState() ? ColorAssist.getClientColor() : ThemeManager.offModuleColor.getColor();
       int secondaryColor = this.module.isState() ? ColorAssist.getClientColor2() : ThemeManager.offModuleColor.getColor();
       this.rectangle
          .render(
             ShapeProperties.create(context.getMatrices(), this.x, this.y, this.width, this.height)
-               .round(5.0F)
+               .round(7.0F)
                .color(backgroundColor, backgroundColor, secondaryColor, secondaryColor)
+               .build()
+         );
+      this.rectangle
+         .render(
+            ShapeProperties.create(context.getMatrices(), this.x + 4.0F, this.y, this.width - 8.0F, 1.0F)
+               .color(this.module.isState() ? 0x40FFFFFF : 0x18FFFFFF)
                .build()
          );
       String moduleName = this.binding ? "binding.." : this.module.getVisibleName();
       float textWidth = Fonts.getSize(14, Fonts.Type.ROCKSTAR_SEMIBOLD).getStringWidth(moduleName);
       float textX = this.x + (this.width - textWidth) / 2.0F;
-      float textY = this.y + 16.5F - Fonts.getSize(14, Fonts.Type.ROCKSTAR_SEMIBOLD).getStringHeight(moduleName);
+      float textY = this.y + 17.0F - Fonts.getSize(14, Fonts.Type.ROCKSTAR_SEMIBOLD).getStringHeight(moduleName);
       Fonts.getSize(14, Fonts.Type.ROCKSTAR_SEMIBOLD).drawString(context.getMatrices(), moduleName, textX, textY, ThemeManager.textColor.getColor());
       if (hasSettings) {
          String arrow = isExpanded ? "j" : "i";
          float arrowX = this.x + this.width - 15.0F;
-         float arrowY = this.y + 15.5F - Fonts.getSize(12, Fonts.Type.ELIXIR_ICONS).getStringHeight(arrow);
+         float arrowY = this.y + 16.0F - Fonts.getSize(12, Fonts.Type.ELIXIR_ICONS).getStringHeight(arrow);
          Fonts.getSize(12, Fonts.Type.ELIXIR_ICONS).drawString(context.getMatrices(), arrow, arrowX, arrowY, ThemeManager.textColor.getColor());
       }
 

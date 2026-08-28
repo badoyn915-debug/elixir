@@ -301,9 +301,10 @@ public class MenuScreen extends Screen implements QuickImports {
       float currentAlpha = animController.isClosing() ? animController.getAlpha() : this.getScaleAnimation();
       float offsetX = animController.isClosing() ? animController.getOffsetX() : 0.0F;
       float offsetY = animController.isClosing() ? animController.getOffsetY() : 0.0F;
+      code.elixir.utils.display.render.MainMenuSkyRenderer.render(context, window.getScaledWidth(), window.getScaledHeight(), currentAlpha);
       rectangle.render(
          ShapeProperties.create(context.getMatrices(), 0.0, 0.0, window.getScaledWidth(), window.getScaledHeight())
-            .color(Calculate.applyOpacity(-16777216, 100.0F * currentAlpha))
+            .color(Calculate.applyOpacity(-16777216, 125.0F * currentAlpha))
             .build()
       );
 
@@ -377,16 +378,17 @@ public class MenuScreen extends Screen implements QuickImports {
    private void renderSidebarLayout(DrawContext context, float mouseX, float mouseY, float delta) {
       MatrixStack matrices = context.getMatrices();
       MenuScreen.GuiLayout layout = this.getLayout();
-      int baseColor = ThemeManager.BackgroundGui.getColor();
-      int bodyColor = Calculate.applyOpacity(-16777216, 170.0F);
-      int sidebarColor = 0;
+      int bodyColor = ThemeManager.BackgroundGui.getColor();
+      int sidebarColor = Calculate.applyOpacity(-16777216, 75.0F);
       ClickGui clickGui = ClickGui.getInstance();
       if (ThemeManager.isLiquidGlassTheme() || clickGui != null && clickGui.shouldRenderBackgroundBlur()) {
          this.drawBlurMaskSafe(matrices, layout.x, layout.y, layout.width, layout.height, 16.0F);
       }
 
-      rectangle.render(ShapeProperties.create(matrices, layout.x, layout.y, layout.width, layout.height).round(8.0F).color(bodyColor).build());
-      rectangle.render(ShapeProperties.create(matrices, layout.x, layout.y, layout.sidebarWidth, layout.height).round(8.0F).color(sidebarColor).build());
+      rectangle.render(ShapeProperties.create(matrices, layout.x, layout.y, layout.width, layout.height).round(12.0F).color(bodyColor).build());
+      rectangle.render(ShapeProperties.create(matrices, layout.x, layout.y, layout.sidebarWidth, layout.height).round(12.0F, 0.0F, 12.0F, 0.0F).color(sidebarColor).build());
+      rectangle.render(ShapeProperties.create(matrices, layout.x + layout.sidebarWidth, layout.y + 10.0F, 1.0F, layout.height - 20.0F).color(0x20FFFFFF).build());
+      rectangle.render(ShapeProperties.create(matrices, layout.x + 10.0F, layout.y, layout.width - 20.0F, 1.0F).color(0x30FFFFFF).build());
       this.renderSidebar(context, layout, mouseX, mouseY);
       this.renderContent(context, layout, mouseX, mouseY, delta);
       windowManager.render(context, (int)mouseX, (int)mouseY, delta);
@@ -463,8 +465,13 @@ public class MenuScreen extends Screen implements QuickImports {
          this.categorySelectAnimations.put(category, anim);
          float mix = Math.min(1.0F, anim + (hovered ? 0.35F : 0.0F));
          if (selected || hovered) {
-            int bg = Calculate.applyOpacity(ThemeManager.BackgroundGui.getColor(), 70 + (int)(mix * 110.0F));
-            rectangle.render(ShapeProperties.create(matrices, layout.x + 8.0F, itemY, layout.sidebarWidth - 16.0F, itemHeight).round(5.0F).color(bg).build());
+            int bg = selected
+               ? Calculate.applyOpacity(ThemeManager.primaryColor.getColor(), (int)(110.0F + mix * 90.0F))
+               : Calculate.applyOpacity(ThemeManager.textColor.getColor(), (int)(20.0F + mix * 35.0F));
+            rectangle.render(ShapeProperties.create(matrices, layout.x + 8.0F, itemY, layout.sidebarWidth - 16.0F, itemHeight).round(7.0F).color(bg).build());
+            if (selected) {
+               rectangle.render(ShapeProperties.create(matrices, layout.x + 8.0F, itemY + 4.0F, 2.5F, itemHeight - 8.0F).round(1.5F).color(ThemeManager.textColor.getColor()).build());
+            }
          }
 
          if (selected) {

@@ -42,19 +42,19 @@ public class ThemeManager {
    private static final String LEGACY2_BACKGROUND_SETTINGS_KEY = "Р В¦Р Р†Р ВµРЎвЂљ Р Р…Р В°РЎРѓРЎвЂљРЎР‚Р С•Р ВµР С” Р С\u0098Р С•Р Т‘РЎС“Р В»РЎРЏ";
    private static final String LEGACY2_TEXT_COLOR_KEY = "Р В¦Р Р†Р ВµРЎвЂљ РЎвЂљР ВµР С”РЎРѓРЎвЂљР В°";
    public static final ColorSetting primaryColor = new ThemeManager.AnimatedColorSetting("Основной цвет", "Основной цвет клиента")
-      .setColor(new Color(255, 101, 57, 255).getRGB())
-      .presets(-9659651, -7569409, -23178, -33925);
+      .setColor(new Color(115, 135, 255, 255).getRGB())
+      .presets(new Color(115, 135, 255).getRGB(), new Color(185, 205, 255).getRGB(), new Color(140, 180, 255).getRGB(), new Color(220, 230, 255).getRGB());
    public static final ColorSetting secondaryColor = new ThemeManager.AnimatedColorSetting("Вторичный цвет", "Вторичный цвет клиента")
-      .setColor(new Color(255, 101, 57, 255).getRGB())
-      .presets(-9659651, -7569409, -23178, -33925);
+      .setColor(new Color(185, 205, 255, 255).getRGB())
+      .presets(new Color(115, 135, 255).getRGB(), new Color(185, 205, 255).getRGB(), new Color(140, 180, 255).getRGB(), new Color(220, 230, 255).getRGB());
    public static final ColorSetting BackgroundGui = new ThemeManager.AnimatedColorSetting("Цвет заднего фона", "Цвет заднего фона в GUI")
-      .setColor(new Color(17, 17, 20, 255).getRGB());
+      .setColor(new Color(14, 14, 18, 220).getRGB());
    public static final ColorSetting offModuleColor = new ThemeManager.AnimatedColorSetting("Цвет выкл. модулей", "Цвет выключенных модулей в GUI")
-      .setColor(new Color(32, 32, 35, 255).getRGB());
+      .setColor(new Color(24, 24, 30, 190).getRGB());
    public static final ColorSetting BackgroundSettings = new ThemeManager.AnimatedColorSetting("Цвет настроек модуля", "Цвет фона настроек модуля")
-      .setColor(new Color(27, 27, 30, 255).getRGB());
+      .setColor(new Color(18, 18, 22, 230).getRGB());
    public static final ColorSetting textColor = new ThemeManager.AnimatedColorSetting("Цвет текста", "Основной цвет текста в GUI")
-      .setColor(new Color(255, 255, 255, 255).getRGB());
+      .setColor(new Color(245, 248, 255, 255).getRGB());
    private static String currentThemeName = "default_dark";
    private static boolean liquidGlassCustomMode = false;
    private static float liquidGlassGlobalAlphaMin = 0.85F;
@@ -129,12 +129,12 @@ public class ThemeManager {
          theme.addProperty("version", "1.0");
          theme.addProperty("timestamp", System.currentTimeMillis());
          JsonObject colors = new JsonObject();
-         colors.addProperty("Первый цвет", new Color(108, 101, 204, 255).getRGB());
-         colors.addProperty("Второй цвет", new Color(177, 149, 214, 255).getRGB());
-         colors.addProperty("Цвет заднего фона", new Color(17, 17, 20, 255).getRGB());
-         colors.addProperty("Цвет выкл. модулей", new Color(32, 32, 35, 255).getRGB());
-         colors.addProperty("Цвет настроек модуля", new Color(27, 27, 30, 180).getRGB());
-         colors.addProperty("Цвет текста", new Color(255, 255, 255, 255).getRGB());
+         colors.addProperty("Первый цвет", new Color(115, 135, 255, 255).getRGB());
+         colors.addProperty("Второй цвет", new Color(185, 205, 255, 255).getRGB());
+         colors.addProperty("Цвет заднего фона", new Color(14, 14, 18, 220).getRGB());
+         colors.addProperty("Цвет выкл. модулей", new Color(24, 24, 30, 190).getRGB());
+         colors.addProperty("Цвет настроек модуля", new Color(18, 18, 22, 230).getRGB());
+         colors.addProperty("Цвет текста", new Color(245, 248, 255, 255).getRGB());
          theme.add("colors", colors);
          theme.add("liquidGlass", createLiquidGlassJson());
          File themeFile = new File(getThemeDir(), "default_dark.json");
