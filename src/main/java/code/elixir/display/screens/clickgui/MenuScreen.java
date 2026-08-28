@@ -2120,6 +2120,16 @@ public class MenuScreen extends Screen implements QuickImports {
             }
          }
 
+         float columnWidth = 130.0F;
+         float headerHeight = 28.0F;
+         rectangle.render(
+            ShapeProperties.create(matrices, x, y, columnWidth, headerHeight)
+               .round(7.0F)
+               .color(Calculate.applyOpacity(ThemeManager.BackgroundGui.getColor(), 220.0F))
+               .build()
+         );
+         rectangle.render(ShapeProperties.create(matrices, x + 4.0F, y, columnWidth - 8.0F, 1.0F).color(0x30FFFFFF).build());
+
          float visibleModulesHeight = maxVisibleHeight;
          String categoryIcon = this.getCategoryIcon(column.category);
          String categoryName = column.category.getReadableName();
@@ -2132,6 +2142,14 @@ public class MenuScreen extends Screen implements QuickImports {
          Fonts.getSize(14, Fonts.Type.ROCKSTAR_MEDIUM).drawString(matrices, categoryName, textX, textY, ThemeManager.textColor.getColor());
          float panelY = y + 28.0F + 4.0F;
          float panelHeight = maxVisibleHeight + 20.0F;
+         rectangle.render(
+            ShapeProperties.create(matrices, x, panelY, columnWidth, panelHeight)
+               .round(8.0F)
+               .color(Calculate.applyOpacity(ThemeManager.BackgroundGui.getColor(), 180.0F))
+               .build()
+         );
+         rectangle.render(ShapeProperties.create(matrices, x + 4.0F, panelY, columnWidth - 8.0F, 1.0F).color(0x20FFFFFF).build());
+
          float contentY = panelY + 10.0F;
          float contentX = x + 10.0F;
          float contentWidth = 110.0F;
@@ -2207,6 +2225,16 @@ public class MenuScreen extends Screen implements QuickImports {
 
    private void renderCustomizationColumn(DrawContext context, MenuScreen.CategoryColumn column, float x, float y, float mouseX, float mouseY, float progress) {
       MatrixStack matrices = context.getMatrices();
+      float columnWidth = 130.0F;
+      float headerHeight = 28.0F;
+      rectangle.render(
+         ShapeProperties.create(matrices, x, y, columnWidth, headerHeight)
+            .round(7.0F)
+            .color(Calculate.applyOpacity(ThemeManager.BackgroundGui.getColor(), 220.0F))
+            .build()
+      );
+      rectangle.render(ShapeProperties.create(matrices, x + 4.0F, y, columnWidth - 8.0F, 1.0F).color(0x30FFFFFF).build());
+
       String categoryIcon = this.getCategoryIcon(column.category);
       String categoryName = column.category.getReadableName();
       float iconX = x + 10.0F;
@@ -2219,6 +2247,14 @@ public class MenuScreen extends Screen implements QuickImports {
       float panelY = y + 28.0F + 4.0F;
       float maxVisibleHeight = 198.0F;
       float panelHeight = maxVisibleHeight + 20.0F;
+      rectangle.render(
+         ShapeProperties.create(matrices, x, panelY, columnWidth, panelHeight)
+            .round(8.0F)
+            .color(Calculate.applyOpacity(ThemeManager.BackgroundGui.getColor(), 180.0F))
+            .build()
+      );
+      rectangle.render(ShapeProperties.create(matrices, x + 4.0F, panelY, columnWidth - 8.0F, 1.0F).color(0x20FFFFFF).build());
+
       float contentY = panelY + 10.0F;
       float contentX = x + 10.0F;
       float contentWidth = 110.0F;
